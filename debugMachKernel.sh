@@ -4,7 +4,7 @@
 # Script (debugMachKernel.sh) to forward calls from _kprintf to _printf
 #
 # Version 0.2 - Copyright (c) 2012 by † RevoGirl
-# Version 0.7 - Copyright (c) 2014 by Pike R. Alpha
+# Version 0.8 - Copyright (c) 2014 by Pike R. Alpha
 #
 # Updates:
 #			- Variable 'gID' was missing (Pike R. Alpha, January 2014)
@@ -15,6 +15,7 @@
 #			- New argument: test - show addresses without patching anything (Pike R. Alpha, Februari 2014)
 #			- New argument: off/restore - restore backup mach_kernel (Pike R. Alpha, Februari 2014)
 #			- Use C3 (ret) instead of 90 (nop) as last byte/instruction (Pike R. Alpha, Februari 2014)
+#			- Now using callq instead of jmpq (Pike R. Alpha, Februari 2014)
 #
 
 #================================= GLOBAL VARS ==================================
@@ -22,7 +23,7 @@
 #
 # Script version info.
 #
-gScriptVersion=0.7
+gScriptVersion=0.8
 
 #
 # Setting the debug mode (default off).
@@ -504,7 +505,7 @@ function main()
   #
   # Construct replacement bytes.
   #
-  replacementBytes="E9${jmpqAddress:6:2}${jmpqAddress:4:2}${jmpqAddress:2:2}${jmpqAddress:0:2}C3"
+  replacementBytes="E8${jmpqAddress:6:2}${jmpqAddress:4:2}${jmpqAddress:2:2}${jmpqAddress:0:2}C3"
   _DEBUG_PRINT "replacementBytes: ${replacementBytes}\n"
   #
   # Get the current (uppercase) bytes from $kprintfOffset.
@@ -525,7 +526,7 @@ function main()
       #
       # No. Ready to patch /mach_kernel.
       #
-      replacementBytes="E9${jmpqAddress:6:2} ${jmpqAddress:4:2}${jmpqAddress:2:2} ${jmpqAddress:0:2}C3"
+      replacementBytes="E8${jmpqAddress:6:2} ${jmpqAddress:4:2}${jmpqAddress:2:2} ${jmpqAddress:0:2}C3"
       _DEBUG_PRINT "replacementBytes: ${replacementBytes}\n"
 
       if [[ $action != 'test' ]];
