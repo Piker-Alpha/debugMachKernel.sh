@@ -4,13 +4,16 @@
 # Script (debugMachKernel.sh) to forward calls from _kprintf to _printf
 #
 # Version 0.2 - Copyright (c) 2012 by † RevoGirl
-# Version 0.5 - Copyright (c) 2014 by Pike R. Alpha
+# Version 0.6 - Copyright (c) 2014 by Pike R. Alpha
 #
 # Updates:
 #			- Variable 'gID' was missing (Pike R. Alpha, January 2014)
 #			- Output styling (Pike R. Alpha, January 2014)
 #			- DEBUG replaced by gDebug (Pike R. Alpha, Februari 2014)
-#			- Swtched off debug mode (Pike R. Alpha, Februari 2014)
+#			- Switched off debug mode (Pike R. Alpha, Februari 2014)
+#			- Backup mach_kernel before patching it (Pike R. Alpha, Februari 2014)
+#			- New argument: test - show addresses without patching anything (Pike R. Alpha, Februari 2014)
+#			- New argument: off/restore - restore backup mach_kernel (Pike R. Alpha, Februari 2014)
 #
 
 #================================= GLOBAL VARS ==================================
@@ -18,7 +21,7 @@
 #
 # Script version info.
 #
-gScriptVersion=0.5
+gScriptVersion=0.6
 
 #
 # Setting the debug mode (default off).
@@ -71,6 +74,28 @@ function _DEBUG_PRINT()
   fi
 }
 
+
+#
+#--------------------------------------------------------------------------------
+#
+function _PRINT()
+{
+  #
+  # Fancy output style?
+  #
+  if [[ $gExtraStyling -eq 1 ]];
+    then
+      #
+      # Yes. Use a somewhat nicer output style.
+      #
+      printf "${STYLE_BOLD}${1}${STYLE_RESET}"
+    else
+      #
+      # No. Use the basic output style.
+      #
+      printf "${1}"
+  fi
+}
 
 #
 #--------------------------------------------------------------------------------
@@ -279,6 +304,91 @@ function _getTextSegmentOffset()
 # done
 }
 
+
+#
+#--------------------------------------------------------------------------------
+#
+
+function _backupMachKernel()
+{
+  #
+  # Get build version.
+  #
+  local buildVersion=$(sw_vers -buildVersion)
+  #
+  # Do we have a backup file already?
+  #
+  if [ -e "${gTargetFile}_${buildVersion}" ];
+    then
+      #
+      # Yes. Get the md5 checksum of the source and target file.
+      #
+      local md5SourceFile=$(md5 "${gTargetFile}")
+      local md5TargetFile=$(md5 "${gTargetFile}_${buildVersion}")
+      #
+      # Different checksums?
+      #
+      if [[ $md5SourceFile != $md5TargetFile ]];
+        then
+          #
+          # Yes. Copy /mach_kernel to (example) /mach_kernel_13C58
+          #
+          cp "${gTargetFile}" "${gTargetFile}_${buildVersion}"
+      fi
+    else
+      cp "${gTargetFile}" "${gTargetFile}_${buildVersion}"
+  fi
+}
+
+
+#
+#--------------------------------------------------------------------------------
+#
+
+function _restoreMachKernel()
+{
+  #
+  # Get build version.
+  #
+  local buildVersion=$(sw_vers -buildVersion)
+  #
+  # Is a previously backuped file availble?
+  #
+  if [ -e "${gTargetFile}_${buildVersion}" ];
+    then
+      #
+      # Yes. Get the md5 checksum of the source and target file.
+      #
+      local md5SourceFile=$(md5 "${gTargetFile}")
+      local md5TargetFile=$(md5 "${gTargetFile}_${buildVersion}")
+      #
+      # Different checksums?
+      #
+      if [[ $md5SourceFile != $md5TargetFile ]];
+        then
+          #
+          # Yes. Copy backup (example) /mach_kernel_13C58 to /mach_kernel
+          #
+          cp "${gTargetFile}_${buildVersion}" "${gTargetFile}"
+        else
+          _PRINT_ERROR "MD5 ${gTargetFile}_${buildVersion} equals MD5 ${gTargetFile}!\n"
+      fi
+    else
+      _PRINT_ERROR "${gTargetFile}_${buildVersion} NOT found!\n"
+  fi
+}
+
+
+#
+#--------------------------------------------------------------------------------
+#
+
+function _toLowerCase()
+{
+  echo "`echo $1 | tr '[:upper:]' '[:lower:]'`"
+}
+
+
 #
 #--------------------------------------------------------------------------------
 #
@@ -287,10 +397,32 @@ function main()
 {
   _showHeader
 
+  action=$(_toLowerCase $1)
+  #
+  # Are we being asked to restore the untouched mach_kernel?
+  #
+  if [[ $action == "off" || $action == "restore" ]];
+    then
+      #
+      # Yes. Restore (example) /mach_kernel_13C58
+      #
+      _restoreMachKernel
+      _PRINT 'Done.\n\n'
+      return
+  fi
+  #
+  # _getTextSegmentOffset (machOffset/0) (machHeaderLength/32)
+  #
   segmentOffset=$(_getTextSegmentOffset 0 32)
   _DEBUG_PRINT "segmentOffset  @ ${segmentOffset}\n"
-
-  if [[ $segmentOffset =~ "0xFFFFFF80" ]];
+  #
+  # Check address.
+  #
+  # Note: 'getconf LONG_MAX' returns 9223372036854775807 (0x7FFFFFFFFFFFFFFF)
+  #       and thus we cannot convert something like 0xffffff8000000000 without
+  #       first stripping the 'ffffff80' off of it (otherwise it is too big).
+  #
+  if [[ $segmentOffset =~ '0xFFFFFF80' ]];
     then
       segmentOffset=$(echo $segmentOffset | sed 's/0xFFFFFF80//')
       segmentOffset=$(echo "ibase=16; ${segmentOffset}" | bc)
@@ -303,8 +435,14 @@ function main()
 
   kprintfAddress="0x"$(nm -x -Ps __TEXT __text -arch x86_64 "${gTargetFile}" | grep ' _kprintf$' | awk '{ printf toupper($1)}')
   printf "_kprintf found @ ${kprintfAddress}\n"
-
-  if [[ $kprintfAddress =~ "0xFFFFFF80" ]];
+  #
+  # Check address.
+  #
+  # Note: 'getconf LONG_MAX' returns 9223372036854775807 (0x7FFFFFFFFFFFFFFF)
+  #       and thus we cannot convert something like 0xffffff8000000000 without
+  #       first stripping the 'ffffff80' off of it (otherwise it is too big).
+  #
+  if [[ $kprintfAddress =~ '0xFFFFFF80' ]];
     then
       kprintfAddress=$(echo ${kprintfAddress}  | sed 's/0xFFFFFF80//')
       kprintfAddress=$(echo "ibase=16; ${kprintfAddress}" | bc)
@@ -313,18 +451,26 @@ function main()
 
   let kprintfOffset=$kprintfAddress-$segmentOffset
   printf "File offset....: 0x%x / ${kprintfOffset}\n\n" $kprintfOffset
-
+  #
+  # Is debug output enabled?
+  #
   if (( $gDebug ));
     then
-      printf "Raw data: "
+      printf 'Raw data: '
       dd if="${gTargetFile}" bs=1 skip=$kprintfOffset count=16 2> /dev/null | xxd -l 16
       echo ''
   fi
 
   printfAddress="0x"$(nm -x -Ps __TEXT __text -arch x86_64 "${gTargetFile}" | grep ' _printf$' | awk '{ printf toupper($1)}')
   printf "_printf  found @ ${printfAddress}\n"
-
-  if [[ $printfAddress =~ "0xFFFFFF80" ]];
+  #
+  # Check address.
+  #
+  # Note: 'getconf LONG_MAX' returns 9223372036854775807 (0x7FFFFFFFFFFFFFFF)
+  #       and thus we cannot convert something like 0xffffff8000000000 without
+  #       first stripping the 'ffffff80' off of it (otherwise it is too big).
+  #
+  if [[ $printfAddress =~ '0xFFFFFF80' ]];
     then
       printfAddress=$(echo $printfAddress | sed 's/0xFFFFFF80//')
       printfAddress=$(echo "ibase=16; ${printfAddress}" | bc)
@@ -333,12 +479,20 @@ function main()
 
   let printfOffset=$printfAddress-$segmentOffset
   printf "File offset....: 0x%x / ${printfOffset}\n\n" $printfOffset
-
+  #
+  # _printf before _kprintf
+  #
   if [[ $kprintfAddress > $printfAddress ]];
     then
+      #
+      # No. We need to jump back.
+      #
       let diff=$kprintfAddress-$printfAddress
       let addressDiff=(0xffffffff-$diff)-4
     else
+      #
+      # Yes. Jump forward.
+      #
       let addressDiff=($printfAddress-$kprintfAddress)+4
   fi
   #
@@ -346,40 +500,47 @@ function main()
   #
   jmpqAddress=$(echo "ibase=10; obase=16; ${addressDiff}" | bc)
   _DEBUG_PRINT "jmpqAddress: ${jmpqAddress}\n"
-
+  #
+  # Construct replacement bytes.
+  #
   replacementBytes="E9${jmpqAddress:6:2}${jmpqAddress:4:2}${jmpqAddress:2:2}${jmpqAddress:0:2}90"
   _DEBUG_PRINT "replacementBytes: ${replacementBytes}\n"
-
+  #
+  # Get the current (uppercase) bytes from $kprintfOffset.
+  #
   local currentBytes=$(echo $(_readFile $kprintfOffset 6) | awk '{ printf toupper($1)}')
   _DEBUG_PRINT "currentBytes: ${currentBytes}\n\n"
-
+  #
+  # Is /mach_kernel already patched?
+  #
   if [[ $currentBytes == $replacementBytes ]];
     then
+      #
+      # Yes. Bail out with error.
+      #
       _PRINT_ERROR '_kprintf is already patched!\n'
       _ABORT
     else
       #
-      # We're ready to patch the mach_kernel.
+      # No. Ready to patch /mach_kernel.
       #
       replacementBytes="E9${jmpqAddress:6:2} ${jmpqAddress:4:2}${jmpqAddress:2:2} ${jmpqAddress:0:2}90"
       _DEBUG_PRINT "replacementBytes: ${replacementBytes}\n"
 
-      echo "0:${replacementBytes}" | xxd -c 12 -r | dd of="${gTargetFile}" bs=1 seek=${kprintfOffset} conv=notrunc
-
-      #
-      # Fancy output style?
-      #
-      if [[ $gExtraStyling -eq 1 ]];
+      if [[ $action != 'test' ]];
         then
           #
-          # Yes. Use a somewhat nicer output style.
+          # First backup /mach_kernel
           #
-          printf "${STYLE_BOLD}Done.${STYLE_RESET}\n\n"
+          _backupMachKernel
+          #
+          # Now bin-patch /mach_kernel
+          #
+          echo "0:${replacementBytes}" | xxd -c 12 -r | dd of="${gTargetFile}" bs=1 seek=${kprintfOffset} conv=notrunc
+
+          _PRINT 'Done.\n\n'
         else
-          #
-          # No. Use the basic output style.
-          #
-          printf "Done.\n\n"
+          _PRINT 'Nothing done.\n\n'
       fi
   fi
 }
