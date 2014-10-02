@@ -4,7 +4,7 @@
 # Script (debugMachKernel.sh) to forward calls from _kprintf to _printf
 #
 # Version 0.2 - Copyright (c) 2012 by † RevoGirl
-# Version 0.9 - Copyright (c) 2014 by Pike R. Alpha
+# Version 1.0 - Copyright (c) 2014 by Pike R. Alpha
 #
 # Updates:
 #			- Variable 'gID' was missing (Pike R. Alpha, January 2014)
@@ -17,14 +17,14 @@
 #			- Use C3 (ret) instead of 90 (nop) as last byte/instruction (Pike R. Alpha, Februari 2014)
 #			- Now using callq instead of jmpq (Pike R. Alpha, Februari 2014)
 #			- No longer using jmpq instead of callq because that doesn't work (Pike R. Alpha, Februari 2014)
-#
+#           - Initial support for Yosemite added (Pike R. Alpha, June 2014)
 
 #================================= GLOBAL VARS ==================================
 
 #
 # Script version info.
 #
-gScriptVersion=0.9
+gScriptVersion=1.0
 
 #
 # Setting the debug mode (default off).
@@ -49,9 +49,9 @@ STYLE_BOLD="[1m"
 STYLE_UNDERLINED="[4m"
 
 #
+# This will be changed for Yosemite later on (in function _selectTargetKernel).
 #
-#
-gTargetFile="/mach_kernel"
+gTargetFile="mach_kernel"
 
 
 #
@@ -60,7 +60,7 @@ gTargetFile="/mach_kernel"
 
 function _showHeader()
 {
-  printf "debugMachKernel.sh v0.9 Copyright (c) 2012 by † RevoGirl\n"
+  printf "debugMachKernel.sh v0.2 Copyright (c) 2012 by † RevoGirl\n"
   printf "                   v${gScriptVersion} Copyright (c) 2013-$(date "+%Y") by Pike R. Alpha\n"
   echo -e '----------------------------------------------------------------\n'
 }
@@ -146,6 +146,22 @@ function _ABORT()
   fi
 
   exit 1
+}
+
+
+#
+#--------------------------------------------------------------------------------
+#
+
+function _selectTargetKernel()
+{
+  #
+  # First try to locate the Yosemite kernel.
+  #
+  if [[ -e /System/Library/Kernels/kernel ]];
+    then
+      gTargetFile="/System/Library/Kernels/kernel"
+  fi
 }
 
 
@@ -334,7 +350,10 @@ function _backupMachKernel()
       if [[ $md5SourceFile != $md5TargetFile ]];
         then
           #
-          # Yes. Copy /mach_kernel to (example) /mach_kernel_13C58
+          # Yes. Backup (copy). 
+          #
+          # Example for 10.9 : /mach_kernel -> /mach_kernel_13C58
+          # Example for 10.10: /System/Library/Kernels/kernel -> /System/Library/Kernels/kernel_14A238x
           #
           cp "${gTargetFile}" "${gTargetFile}_${buildVersion}"
       fi
@@ -399,15 +418,19 @@ function _toLowerCase()
 function main()
 {
   _showHeader
+  _selectTargetKernel
 
   action=$(_toLowerCase $1)
   #
-  # Are we being asked to restore the untouched mach_kernel?
+  # Are we being asked to restore the untouched (mach_)kernel?
   #
   if [[ $action == "off" || $action == "restore" ]];
     then
       #
-      # Yes. Restore (example) /mach_kernel_13C58
+      # Yes. Restore (mach_)kernel
+      #
+      # Example for 10.9 : /mach_kernel_13C58 -> /mach_kernel
+      # Example for 10.10: /System/Library/Kernels/kernel_14A238x -> /System/Library/Kernels/kernel
       #
       _restoreMachKernel
       _PRINT 'Done.\n\n'
@@ -514,7 +537,7 @@ function main()
   local currentBytes=$(echo $(_readFile $kprintfOffset 6) | awk '{ printf toupper($1)}')
   _DEBUG_PRINT "currentBytes: ${currentBytes}\n\n"
   #
-  # Is /mach_kernel already patched?
+  # Is the kernel already patched?
   #
   if [[ $currentBytes == $replacementBytes ]];
     then
@@ -525,7 +548,7 @@ function main()
       _ABORT
     else
       #
-      # No. Ready to patch /mach_kernel.
+      # No. Ready to patch /mach_kernel or /System/Library/Kernels/kernel
       #
       replacementBytes="E9${jmpqAddress:6:2} ${jmpqAddress:4:2}${jmpqAddress:2:2} ${jmpqAddress:0:2}C3"
       _DEBUG_PRINT "replacementBytes: ${replacementBytes}\n"
@@ -533,11 +556,11 @@ function main()
       if [[ $action != 'test' ]];
         then
           #
-          # First backup /mach_kernel
+          # First backup /mach_kernel or /System/Library/Kernels/kernel
           #
           _backupMachKernel
           #
-          # Now bin-patch /mach_kernel
+          # Now bin-patch /mach_kernel or /System/Library/Kernels/kernel
           #
           echo "0:${replacementBytes}" | xxd -c 12 -r | dd of="${gTargetFile}" bs=1 seek=${kprintfOffset} conv=notrunc
 
