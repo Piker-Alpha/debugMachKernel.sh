@@ -1,0 +1,19 @@
+
+
+1.) Download debugMachKernel.sh with:
+
+curl -o ~/debugMachKernel.sh https://raw.githubusercontent.com/Piker-Alpha/ssdtPRGen.sh/master/debugMachKernel.sh
+
+
+2.) Change the permissions with:
+
+sudo chmod +x ~/debugMachKernel.sh
+
+
+3.) Change your Kernel Flags to:
+
+<key>Kernel Flags</key>
+<string>debug=0x12a acpi_layer=0x08 acpi_level=0x02 msgbuf=309212</string>
+
+Note: Make this change in /Library/Preferences/SystemConfiguration/com.apple.Boot.plist
+
