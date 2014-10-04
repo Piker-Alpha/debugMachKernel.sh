@@ -4,7 +4,7 @@
 # Script (debugMachKernel.sh) to forward calls from _kprintf to _printf
 #
 # Version 0.2 - Copyright (c) 2012 by † RevoGirl
-# Version 1.0 - Copyright (c) 2014 by Pike R. Alpha
+# Version 1.1 - Copyright (c) 2014 by Pike R. Alpha
 #
 # Updates:
 #			- Variable 'gID' was missing (Pike R. Alpha, January 2014)
@@ -18,13 +18,14 @@
 #			- Now using callq instead of jmpq (Pike R. Alpha, Februari 2014)
 #			- No longer using jmpq instead of callq because that doesn't work (Pike R. Alpha, Februari 2014)
 #           - Initial support for Yosemite added (Pike R. Alpha, June 2014)
+#           - Fixed path to mach_kernel
 
 #================================= GLOBAL VARS ==================================
 
 #
 # Script version info.
 #
-gScriptVersion=1.0
+gScriptVersion=1.1
 
 #
 # Setting the debug mode (default off).
@@ -51,7 +52,7 @@ STYLE_UNDERLINED="[4m"
 #
 # This will be changed for Yosemite later on (in function _selectTargetKernel).
 #
-gTargetFile="mach_kernel"
+gTargetFile="/mach_kernel"
 
 
 #
