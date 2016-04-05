@@ -4,7 +4,7 @@
 # Script (debugMachKernel.sh) to forward calls from _kprintf to _printf
 #
 # Version 0.2 - Copyright (c) 2012 by † RevoGirl
-# Version 1.1 - Copyright (c) 2014 by Pike R. Alpha
+# Version 1.2 - Copyright (c) 2014 by Pike R. Alpha
 #
 # Updates:
 #			- Variable 'gID' was missing (Pike R. Alpha, January 2014)
@@ -19,13 +19,14 @@
 #			- No longer using jmpq instead of callq because that doesn't work (Pike R. Alpha, Februari 2014)
 #           - Initial support for Yosemite added (Pike R. Alpha, June 2014)
 #           - Fixed path to mach_kernel
+#           - Moved -s argument for compatibility with Xcode 7.3 (Pike R. Alpha, April 2016)
 
 #================================= GLOBAL VARS ==================================
 
 #
 # Script version info.
 #
-gScriptVersion=1.1
+gScriptVersion=1.2
 
 #
 # Setting the debug mode (default off).
@@ -460,7 +461,7 @@ function main()
       fi
   fi
 
-  kprintfAddress="0x"$(nm -x -Ps __TEXT __text -arch x86_64 "${gTargetFile}" | grep ' _kprintf$' | awk '{ printf toupper($1)}')
+  kprintfAddress="0x"$(nm -Px -arch x86_64 "${gTargetFile}" -s __TEXT __text | grep ' _kprintf$' | awk '{ printf toupper($1)}')
   printf "_kprintf found @ ${kprintfAddress}\n"
   #
   # Check address.
@@ -488,7 +489,7 @@ function main()
       echo ''
   fi
 
-  printfAddress="0x"$(nm -x -Ps __TEXT __text -arch x86_64 "${gTargetFile}" | grep ' _printf$' | awk '{ printf toupper($1)}')
+  printfAddress="0x"$(nm -Px -arch x86_64 "${gTargetFile}" -s __TEXT __text | grep ' _printf$' | awk '{ printf toupper($1)}')
   printf "_printf  found @ ${printfAddress}\n"
   #
   # Check address.
